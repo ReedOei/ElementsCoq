@@ -1,0 +1,324 @@
+\documentclass[10pt]{article}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{bm}
+\usepackage{bbm}
+\usepackage{mathtools}
+\usepackage{minted}
+
+\DeclarePairedDelimiter\ceil{\lceil}{\rceil}
+\DeclarePairedDelimiter\floor{\lfloor}{\rfloor}
+
+\newcommand{\defeq}{\vcentcolon=}
+\newcommand{\coq}[1]{\mintinline{coq}{#1}}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{axiom}{Axiom}
+\newtheorem{lemma}{Lemma}
+\newtheorem{proposition}{Proposition}
+\newtheorem{claim}{Claim}
+\newtheorem{corollary}{Corollary}
+
+\begin{document}
+
+\section{Coq}
+
+\subsection{Introduction}
+
+Coq is a proof assistant, built around the Curry-Howard correspondance and the ``Calculus of Constructions'' (CoC).
+
+CoC can serve as a constructive basis for mathematics---every proof is constructive in nature.
+Not only do proofs prove that objects exist, or that properties hold, they also gave you examples of the objects for which the property holds, or a counter example if it does not.
+
+The usual formulation leads to the loss of the Law of the Excluded Middle, among other things, though you are free to define addition axioms if you wish.
+The downside of this is that many proofs will be non-constructive.
+
+One of the major advantages of Coq and constructive proofs, is (in theory), having defined a program and proven it correct in Coq, you can then extract an executable (usually in OCaml or Haskell), which you can be completely assured will run as specified.
+
+Below we give a brief introduction to the calculus of constructions and a simple example of a proof.
+
+\subsection{Terms}
+
+A term is one of the following:
+
+\begin{itemize}
+    \item \texttt{Type}
+    \item \texttt{Prop}
+    \item A variable, like $x$, $y$, etc.
+    \item If $A$ and $B$ are terms, then so is $A~B$ ($B$ applied to $A$).
+    \item If $A$ and $B$ are terms, and $x$ is a variable, then so are $\forall x : A.B$ and $\lambda x : A.B$.
+\end{itemize}
+
+\subsection{Judgements}
+
+There is one central judgement: the \textit{typing} judgment.
+
+These are of the following form:
+
+\begin{equation*}
+    x_1 : \tau_1, x_2 : \tau_2, \ldots \vdash y : \tau'
+\end{equation*}
+
+\subsection{Inference Rules}
+
+\subsubsection{True}
+
+\begin{equation*}
+    \frac{}{\Gamma \vdash \mathtt{True} : \mathtt{True}}
+\end{equation*}
+
+\subsubsection{Identity}
+
+Below, let $K$ be either \texttt{Prop} or \texttt{Type}.
+
+\begin{equation*}
+    \frac{\Gamma \vdash A : K}{\Gamma, x : A \vdash x : A}
+\end{equation*}
+
+\subsubsection{Functions}
+
+\begin{equation*}
+    \frac{\Gamma, x:A \vdash B : K~~~\Gamma, x : A \vdash N : B}{\Gamma \vdash (\lambda x : A.N) : (\forall (x : A).B) : K}
+\end{equation*}
+
+\subsubsection{Universal Quantification}
+
+\begin{equation*}
+    \frac{\Gamma \vdash M : \forall (x : A). B~~~\Gamma \vdash N : A}{\Gamma \vdash M~N : B[x := N]}
+\end{equation*}
+
+Corresponds to:
+
+\begin{equation*}
+    \frac{A \Rightarrow B, A}{B} \text{ or } A \wedge (A \Rightarrow B) \Rightarrow B
+\end{equation*}
+
+\subsubsection{Equality}
+
+\begin{equation*}
+    \frac{\Gamma \vdash M : A~~~A = B~~~B : K}{\Gamma \vdash M : B}
+\end{equation*}
+
+\subsection{Definitions}
+
+\subsubsection{Equality of Values}
+
+\begin{equation*}
+    \frac{}{\Gamma \vdash \mathtt{eq\_refl} : x = x}
+\end{equation*}
+
+Corresponds to:
+
+\begin{equation*}
+    \frac{}{A = A}
+\end{equation*}
+
+\subsubsection{False}
+
+\begin{equation*}
+    \frac{\Gamma \vdash t : \mathtt{False}}{\Gamma \vdash x : \tau}
+\end{equation*}
+
+This allows us to establish ``not'' as follows:
+
+\begin{equation*}
+    \frac{\Gamma \vdash p : \tau \rightarrow \mathtt{False}}{\Gamma \vdash \text{not}(p) :~\sim \tau}
+\end{equation*}
+
+\subsubsection{Conjunction}
+
+Introduction:
+
+\begin{equation*}
+    \frac{\Gamma \vdash A : K~~~B : K~~~x : A~~~y : B}{\Gamma \vdash \mathtt{conj}~x~y : A \wedge B}
+\end{equation*}
+
+Elimination:
+
+\begin{equation*}
+    \frac{\Gamma \vdash A : K~~~B : K~~~\mathtt{conj}~x~y : A \wedge B}{\Gamma \vdash x : A} \text{ and }
+    \frac{\Gamma \vdash A : K~~~B : K~~~\mathtt{conj}~x~y : A \wedge B}{\Gamma \vdash y : B}
+\end{equation*}
+
+\subsubsection{Existence}
+
+\begin{equation*}
+    \frac{\Gamma \vdash \exists x, \varphi(x), \Gamma \vdash \varphi : \tau \rightarrow \mathtt{Prop}}{\Gamma \vdash x : \tau, \Gamma \vdash \varphi(x) : \mathtt{Prop} }
+\end{equation*}
+
+\subsection{Sample Proof}
+
+Consider the following proposition:
+
+$$\frac{A,B,A \wedge B \Rightarrow C}{C}$$
+
+To encode this in Coq we can write:
+
+\begin{minted}{coq}
+Lemma lemma : forall (A B C : Prop), A -> B -> (A /\ B -> C) -> C.
+Proof.
+intros A B C.
+intros HA HB Prf.
+(* HA : A *)
+(* HB : B *)
+(* conj HA  HB : A /\ B *)
+(* Prf : A /\ B -> C *)
+exact (Prf (conj HA HB)).
+Qed.
+\end{minted}
+
+An alternative using ``normal'' functions:
+
+\begin{minted}{coq}
+Definition lemma (A B C : Prop) (HA : A) (HB : B) (Prf : A /\ B -> C) : C :=
+    Prf (conj HA HB).
+\end{minted}
+
+In Haskell:
+\begin{minted}{haskell}
+lemma :: a -> b -> ((a,b) -> c) -> c
+lemma a b prf = prf (a,b)
+\end{minted}
+
+Finally, formalled derived using the inference rules above:
+
+\begin{equation*}
+    \frac{\frac{\Gamma \vdash x : A~~~y : B}{\Gamma \vdash \mathtt{conj}~x~y : A \wedge B}~~~\Gamma \vdash p : (\forall x : A \wedge B.C)}{\Gamma \vdash p~(\mathtt{conj}~x~y) : C}
+\end{equation*}
+
+\section{Axiomatic Euclidean Geometry}
+\subsection{Notions}
+
+\begin{itemize}
+    \item One of the most pervasive concepts in Euclidean geomtry is \textit{length}, though no such thing is formally defined.
+        We define \coq{Length : Type} as a parameter to our Module which is an ordered field.
+
+    \item The second notion is that of a \textit{point}.
+        Again, this is abstractly defined by a parameter \coq{Point : Type}.
+
+    \item A \textit{line segment} is defined by two points.
+
+    \item Critical to our proof are circles, which we define as sets containing \coq{Point}.
+        While they are defined in the list of ``Notions'', we redefine circles as sets of points because this definition is more convenient.
+        We also define/postulate the following related concepts:
+        \begin{itemize}
+            \item Every circle contains at least one point---there is no such thing as an ``empty'' circle, though circles of a single point are allowed.
+            \item For every circle, there is some point which we call its \textit{center}.
+            \item Every circle has an associated length called its \textit{radius}.
+            \item \textit{A radius} (not to be confused with \textbf{the radius} of a circle), is a line segment starting at the center of the circle and ending somewhere on the circle.
+            \item Every radius has the same length.
+            \item In particular, a single point defines a radius if and only if it's distance to the center is the same as some other radius.
+        \end{itemize}
+
+    \item An equilateral triangle is a set of triangle (distinct) points such that the distances between any two is the same.
+
+    \item Two circles centered at different points will \textit{intersect} at either two points, if the sum of their radiuses is less than the length of the line segment connecting their centers; if not, they intersect at zero points.
+        When we say two circles intersect, we are speaking of the sets of points which define them.
+\end{itemize}
+
+\subsection{Axioms}
+
+Following Euclid, we define the following axioms.
+Note that several have been left out, as they are not needed by our proof.
+
+\begin{itemize}
+    \item We combine postulate 1 and postulate 2, since we are concerned only with line segments into the following axiom:
+        \begin{axiom}\label{axiom:line}
+            For any two points $a$ and $b$, there is a line segment, $(a,b)$, connecting the two points.
+        \end{axiom}
+
+        Note we postulate also that the length of $(a,b)$ is the same as the length of $(b,a)$.
+
+    \item We replace postulate 3 with the following:
+        \begin{axiom}\label{axiom:circle}
+            Any two points define a circle, with one of them at the center of the circle and the other on the circle---the line segment defined by these two points is a radius of the circle.
+        \end{axiom}
+\end{itemize}
+
+\section{Propositions}
+
+\subsection{Lemmas}
+
+We begin by proving some lemmas establishing basic facts that are necessary to prove anything more complicated.
+
+\begin{lemma}\label{lemma:has-radius}
+    Every circle has a line segment called it's radius.
+\end{lemma}
+\begin{proof}
+    Follows from the postulate that there is no empty circle.
+\end{proof}
+
+\begin{lemma}
+    If the length from the center of a circle to some point is the radius of the circle, then that point defines a radius of the circle.
+\end{lemma}
+\begin{proof}
+    Call the point $a$ and the circle $c$.
+
+    We need to show that $(\text{center}~c, a)$ is a radius of $c$: that is, it starts at the center of the circle and $a$ is on the circle.
+    The first part is obvious.
+
+    The second follows from Lemma~\ref{lemma:has-radius}, the postulate that all radiuses have the same length, and that a line segment is a radius if and only if it's length is the same as that of the circle.
+\end{proof}
+
+\begin{lemma}
+    If a point defines a radius of some circle, then the length of the line segment connecting the point and the center of the circle is the radius of the circle.
+\end{lemma}
+\begin{proof}
+    The lemma is the same as the previous, except in the opposite direction.
+    It's proof is therefore quite similar---it follows from the same lemmas and propositions.
+\end{proof}
+
+\begin{lemma}\label{lemma:two-circles}
+    Any two distinct points define two circles, which intersect at precisely two points.
+\end{lemma}
+\begin{proof}
+    Let the two points be $a$ and $b$.
+
+    Applying Axiom~\ref{axiom:circle} twice, we obtain the two circles $c_1$ and $c_2$, where $c_1$ is center at $a$ and $c_2$ is centered at $b$.
+
+    The fact that their centers are not equal follows from the assumption of distinctness of $a$ and $b$.
+    This allows us to apply the postulate that these two circles either intersect at two points, or no points at all.
+    Recall that two circles intersect at two points when the distance between them is less than the sum of their radiuses.
+
+    The distance between the centers of the circles is given by $|(a,b)|$, which is also the radius of the one of the circles (in fact, the radius of both circles, but this fact is unimportant).
+    Because the distance is the same as the radius of one of the circles, plus some additional length, we can conclude that the circles are close enough, and therefore intersect at two points.
+\end{proof}
+
+\begin{lemma}
+    The two circles defined by two distinct points have the same radius.
+\end{lemma}
+\begin{proof}
+    This essentially follows from the fact that all radiuses have the same length, and that $|(a,b)| = |(b,a)|$.
+\end{proof}
+
+\begin{lemma}\label{lemma:rad-same}
+    If two circles have the same radius, then any two radiuses of the circles have the same length.
+\end{lemma}
+\begin{proof}
+    This also follows from the fact that any radius of a circle has length equal to the radius of the circle.
+    The rest follows from transitivity of equality.
+\end{proof}
+
+\subsection{Proposition 1}
+
+Finally, we may state and prove the first proposition in the book:
+
+\begin{proposition}
+    Any two distinct points defines at least one equilateral triangle: that is, there is some equilateral triangle whose sides have the same length as the length of the line segment connecting the two points.
+\end{proposition}
+\begin{proof}
+    By Lemma~\ref{lemma:two-circles}, any two points define two circles, which intersect at precisely two points.
+    Call these two points $a$ and $b$.
+    We may arbitrarily pick either point, which will serve as the third point in our equilateral triangle.
+    Call the chosen point $x$.
+
+    This point $x$ is in both circles, so it forms a radius of both circles.
+    Therefore, the distance from $a$ to $x$ is the same as the distance from $b$ to $x$, by Lemma~\ref{lemma:rad-same}.
+
+    Finally, the distance between $a$ and $b$ is the same as the distance from $a$ to $x$ and $b$ to $x$ because they are all radiuses of congruent circle.
+\end{proof}
+
+\end{document}
+
